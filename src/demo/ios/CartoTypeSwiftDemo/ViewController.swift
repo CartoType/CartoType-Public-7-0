@@ -12,7 +12,7 @@ import CoreLocation
 class ViewController: CartoTypeViewController, UISearchBarDelegate, CLLocationManagerDelegate
     {
     var m_framework: CartoTypeFramework!
-    let m_ui_scale: Double = Double(UIScreen.main.scale)
+    let m_ui_scale: Double = Double(UIScreen.main.nativeScale)
     var m_route_start_in_degrees = CartoTypePoint(x:0, y:0)
     var m_route_end_in_degrees = CartoTypePoint(x:0, y:0)
     var m_last_point_pressed_in_degrees = CartoTypePoint(x:0, y:0)
@@ -26,7 +26,7 @@ class ViewController: CartoTypeViewController, UISearchBarDelegate, CLLocationMa
     var m_navigate_button = UIBarButtonItem(title: "Start", style: UIBarButtonItem.Style.plain, target: self, action: #selector(onNavigateButton))
     var m_pushpin_id: UInt64 = 0
     var m_navigating: Bool = false
-    var m_tracking: Bool = false
+    var m_show_location: Bool = false
     var m_location_manager: CLLocationManager!
     var m_location: CLLocation!
     var m_has_scale_bar: Bool = true
@@ -65,7 +65,7 @@ class ViewController: CartoTypeViewController, UISearchBarDelegate, CLLocationMa
             m_location_manager.requestWhenInUseAuthorization()
             }
         }
-        
+                
     func createUI()
         {
         // Create a toolbar.
@@ -223,7 +223,7 @@ class ViewController: CartoTypeViewController, UISearchBarDelegate, CLLocationMa
             {
             case CTErrorNone:
                 stopNavigating()
-                m_tracking = false
+                m_show_location = false
                 m_navigate_button.isEnabled = true
                 break
             case CTErrorNoRoadsNearStartOfRoute: showError("no roads near start of route"); break
@@ -490,18 +490,38 @@ class ViewController: CartoTypeViewController, UISearchBarDelegate, CLLocationMa
         {
         let alert = UIAlertController(title: "View options", message: "Choose the appearance of the map.", preferredStyle: .alert)
         
-        if (m_tracking)
+        if (m_show_location)
             {
-            alert.addAction(UIAlertAction(title: "Stop Tracking Location", style: .default, handler:
+            alert.addAction(UIAlertAction(title: "Stop Showing Location", style: .default, handler:
                 { _ in
-                self.stopTracking()
+                self.stopShowingLocation()
                 }))
             }
         else if (!m_navigating && m_framework.getRouteCount() == 0)
             {
-            alert.addAction(UIAlertAction(title: "Track Location", style: .default, handler:
+            alert.addAction(UIAlertAction(title: "Show Location", style: .default, handler:
                 { _ in
-                self.startTracking()
+                self.startShowingLocation()
+                }))
+            }
+        if (m_framework.tracking())
+            {
+            let length = m_framework.distance(toString: m_framework.trackLengthInMeters(), metricUnits: m_metric_units, abbreviate: true)!;
+            let message = "Stop Tracking (track length = \(length))"
+            alert.addAction(UIAlertAction(title: message, style: .default, handler:
+                { _ in
+                self.m_framework.endTracking()
+                self.m_framework.deleteTrack()
+                self.startOrStopUpdatingLocation()
+                }))
+            }
+        else
+            {
+            alert.addAction(UIAlertAction(title: "Start Tracking", style: .default, handler:
+                { _ in
+                self.m_framework.startTracking()
+                self.m_framework.displayTrack(true)
+                self.startOrStopUpdatingLocation()
                 }))
             }
         if (m_framework.getRotation() != 0)
@@ -552,24 +572,36 @@ class ViewController: CartoTypeViewController, UISearchBarDelegate, CLLocationMa
         present(alert, animated: true, completion: nil)
         }
         
-    func startTracking()
+    func startOrStopUpdatingLocation()
         {
-        if (m_framework.getRouteCount() == 0)
+        if (m_navigating || m_show_location || m_framework.tracking())
             {
             m_location_manager.startUpdatingLocation()
             UIApplication.shared.isIdleTimerDisabled = true  // stop screen going to sleep
+            }
+        else
+            {
+            m_location_manager.stopUpdatingLocation()
+            UIApplication.shared.isIdleTimerDisabled = false
+            }
+        }
+                
+    func startShowingLocation()
+        {
+        if (m_framework.getRouteCount() == 0)
+            {
             m_framework.setFollowMode(FollowModeLocation)
             m_framework.enableLayer("route-vector")
-            m_tracking = true
+            m_show_location = true
+            startOrStopUpdatingLocation()
             }
         }
         
-    func stopTracking()
+    func stopShowingLocation()
         {
-        m_location_manager.stopUpdatingLocation()
-        UIApplication.shared.isIdleTimerDisabled = false
         m_framework.disableLayer("route-vector")
-        m_tracking = false
+        m_show_location = false
+        startOrStopUpdatingLocation()
         }
         
     func startNavigating()
@@ -579,8 +611,6 @@ class ViewController: CartoTypeViewController, UISearchBarDelegate, CLLocationMa
             let alert = UIAlertController(title: "NAVIGATION IS FOR TESTING ONLY AND NOT INTENDED FOR ACTUAL ROUTE GUIDANCE", message: "Press OK to confirm.", preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "OK", style: .default, handler:
                 { _ in
-                self.m_location_manager.startUpdatingLocation()
-                UIApplication.shared.isIdleTimerDisabled = true  // stop screen going to sleep
                 self.m_navigate_button.title = "End"
                 self.m_restore_search_bar = !self.m_search_bar.isHidden
                 self.m_search_bar.isHidden = true
@@ -588,7 +618,8 @@ class ViewController: CartoTypeViewController, UISearchBarDelegate, CLLocationMa
                 self.m_framework.setFollowMode(FollowModeLocationHeadingZoom)
                 self.m_framework.enableLayer("route-vector")
                 self.m_navigating = true
-                self.m_tracking = false
+                self.m_show_location = false
+                self.startOrStopUpdatingLocation()
                 }))
             alert.addAction(UIAlertAction(title: "Cancel", style: .default, handler:
                 { _ in
@@ -599,8 +630,6 @@ class ViewController: CartoTypeViewController, UISearchBarDelegate, CLLocationMa
         
     func stopNavigating()
         {
-        self.m_location_manager.stopUpdatingLocation()
-        UIApplication.shared.isIdleTimerDisabled = false
         m_navigate_button.title = "Start"
         if (m_restore_search_bar)
             {
@@ -610,6 +639,7 @@ class ViewController: CartoTypeViewController, UISearchBarDelegate, CLLocationMa
         m_framework.enableTurnInstructions(false)
         m_framework.disableLayer("route-vector")
         m_navigating = false
+        startOrStopUpdatingLocation()
         }
 
     @objc func onNavigateButton()

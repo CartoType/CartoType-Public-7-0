@@ -710,8 +710,10 @@ class CFramework: public MNavigatorObserver
     std::string Locale() const;
 
     // locale-dependent and configuration-dependent string handling
-    void AppendDistance(MString& aString,double aDistanceInMeters,bool aMetricUnits,bool aAbbreviate = false);
-    void AppendTime(MString& aString,double aTimeInSeconds);
+    void AppendDistance(MString& aString,double aDistanceInMeters,bool aMetricUnits,bool aAbbreviate = false) const;
+    CString DistanceToString(double aDistanceInMeters,bool aMetricUnits,bool aAbbreviate = false) const;
+    void AppendTime(MString& aString,double aTimeInSeconds) const;
+    CString TimeToString(double aTimeInSeconds) const;
     void SetCase(MString& aString,TLetterCase aCase);
     void AbbreviatePlacename(MString& aString);
 
@@ -890,6 +892,15 @@ class CMapRenderer
     void Draw();
     /** Returns true if this map renderer is valid. If it returns false, graphics acceleration is not enabled. */
     bool Valid() const;
+    /**
+    Enables or disables drawing by a separate thread. Returns the previous state.
+    This function is intended for users who need the full capacity of the GPU
+    for a period when drawing is unnecessary.
+    When drawing is disabled, draw events can be handled by calls to Draw, but it is also necessary
+    to create a timer to redraw occasionally (e.g., once per second) to allow missing tiles to be
+    created and drawn after pans, zooms and other changes affecting the display.
+    */
+    bool Enable(bool aEnable);
 
     private:
     std::unique_ptr<CMapRendererImplementation> m_implementation;

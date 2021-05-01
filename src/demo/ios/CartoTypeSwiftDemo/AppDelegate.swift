@@ -19,7 +19,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate
         // Create the CartoType framework
         let bounds = UIScreen.main.bounds
         self.window = UIWindow.init(frame: bounds)
-        let scale = UIScreen.main.scale
+        let scale = UIScreen.main.nativeScale
         let width = bounds.width * scale
         let height = bounds.height * scale
         let param = CartoTypeFrameworkParam()!

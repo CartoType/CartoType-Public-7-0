@@ -81,8 +81,8 @@ template<class point_t> class CGeneralGeometry
         return outline;
         }
 
-    /** Sets the object to its just-constructed state: open, empty, and using map coordinates. */
-    void Clear() { m_contour_array.resize(1); m_contour_array[0].resize(0); m_coord_type = TCoordType::Map; m_closed = false; }
+    /** Deletes all points, leaving the geometry with a single empty contour and its original coordinate type and open/closed state. */
+    void Clear() { m_contour_array.resize(1); m_contour_array[0].resize(0); }
     /** Returns the coordinate type used for all points in this geometry. */
     TCoordType CoordType() const { return m_coord_type; }
     /** Returns the number of contours. */
